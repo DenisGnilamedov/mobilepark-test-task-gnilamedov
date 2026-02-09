@@ -1,0 +1,106 @@
+version: "3.9"
+
+networks:
+  db-postgres-net:
+    driver: overlay
+  db-redis-net:
+    driver: overlay
+volumes:
+  pg_data:
+  redis_data:
+
+secrets:
+  pg_password:
+    external: true
+
+services:
+  my-test-service:
+    image: ubuntu:22.04
+    hostname: "{{.Node.Hostname}}"
+    environment:
+      #- HOSTNAME="{{.Node.Hostname}}"
+      - DATABASE_URL=postgres://app@postgres:5432/app
+      - REDIS_HOST=redis
+    command: sleep infinity
+    volumes:
+      - /home/ubuntu/my-app/logs:/var/log
+    networks:
+      - db-postgres-net 
+      - db-redis-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "1"
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 2
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+        limits:
+          cpus: "1"
+          memory: 500M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.labels.servertype == worker
+
+
+  postgres:
+    image: postgres:18.1-alpine
+    networks: 
+      - db-postgres-net
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    secrets:
+      - pg_password
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.servertype == db
+      restart_policy:
+        condition: on-failure
+      
+
+
+  redis:
+    image: redis:8.4.0-alpine
+    networks: 
+      - db-redis-net
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.servertype == db
+      restart_policy:
+        condition: on-failure
+

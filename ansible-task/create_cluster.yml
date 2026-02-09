@@ -1,0 +1,5 @@
+
+- hosts: swarm-hosts
+  gather_facts: False
+  roles:
+    - create_swarm_cluster

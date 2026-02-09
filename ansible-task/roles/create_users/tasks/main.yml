@@ -1,0 +1,19 @@
+- name: Add tech users
+  user:
+    name: "{{ item }}" 
+    create_home: false
+  loop:
+    - ansible
+    - autodeploy
+
+- name: Extract host index
+  set_fact:
+    admin_user: "{{ admin_user_prefix }}{{ inventory_hostname | regex_search('[0-9]+') }}"
+
+- name: Create admin user
+  user:
+    name: "{{ admin_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true

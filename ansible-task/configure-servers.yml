@@ -1,0 +1,13 @@
+- hosts: workers
+  gather_facts: False
+
+  roles:
+    - create_users
+    - install_packages
+
+- hosts: swarm-hosts
+  gather_facts: False
+
+  roles:
+    - install_docker
+
